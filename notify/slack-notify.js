@@ -8,20 +8,18 @@ var _ = {
 	 * @param {String} slackWebhookUrl Slack webhook url
 	 * @return {Object}               	Promise object
 	 */
-	sendMsg: function(qrcodeImageUrl, slackWebhookUrl) {
+	sendMsg: function(qrcodeImageUrl, config) {
 
 		// check parameter first
 		if (qrcodeImageUrl == null || qrcodeImageUrl == "")
 			return Promise.reject(new Error('QRCode Image Url cannot be null or empty'));
-		if (slackWebhookUrl == null || slackWebhookUrl == "")
-			return Promise.reject(new Error('Slack\'s webhook url cannot be null or empty'));
 
 		logger.log(qrcodeImageUrl);
 
 		// create options to send a request
 		var options = {
 			method: 'POST',
-			uri: process.env.SLACK_WEBHOOK_URL,
+			uri: config.webhook || process.env.SLACK_WEBHOOK_URL,
 			headers: {
 				'Content-Type': 'application/json'
 			},

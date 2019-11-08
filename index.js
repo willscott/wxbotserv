@@ -112,10 +112,10 @@ function _onResourceRequested(requestData) {
 
 		// notify via slack if SLACK_WEBHOOK_URL is set
 		// if not set, then ignore
-		if (process.env.SLACK_WEBHOOK_URL != null) {
+		if (process.env.SLACK_WEBHOOK_URL || defaultConfigs.webhook) {
 			logger.log('sending msg to slack');
 			// notify via slack
-			slackNotify.sendMsg(requestData.url(), process.env.SLACK_WEBHOOK_URL)
+			slackNotify.sendMsg(requestData.url(), defaultConfigs)
 				.then((res) => {
 					logger.log('Sent QRCode image to slack successfully.');
 				})
