@@ -12,12 +12,12 @@ var isLoadedContactsCurrentPage = false;
 events.on(eventsConst.onResourceReceived, (resource) => {
 	// if phantom makes request for contact, and we received the response
 	// then we will mark that we received information
-	if (/^https:\/\/web\.wechat\.com\/cgi-bin\/mmwebwx-bin\/webwxbatchgetcontact.+/.test(resource.url)) {
+	if (/^https:\/\/web\.wechat\.com\/cgi-bin\/mmwebwx-bin\/webwxbatchgetcontact.+/.test(resource.url())) {
 		logger.log('received response for contact request');
 		isLoadedContactsCurrentPage = true;
 	}
 
-	logger.log('received response: ' + resource.url);
+	logger.log('received response: ' + resource.url());
 });
 
 /**
@@ -238,81 +238,7 @@ var _ = {
 										var replyMsg = processorFn(msg);
 
 										// validate
-										if (replyMsg == null || typeof replyMsg !== 'string') {
-											// return immediately, and skip to next message
-											return resolve();
-										}
-
-										// set reply message
-										wxMediator.setReplyMsg(headless, replyMsg)
-											.then((result) => {
-												if (result) {
-													logger.log('successfully set reply msg to textarea');
-
-													// workaround: switch to file transfer
-													// in order to let text message update to DOM
-													wxMediator.clickOnFilehelper(headless)
-														.then((result) => {
-															if (result) {
-																logger.log('[work around] successfully clicked on file helper');
-
-																// click on previously marked convo item
-																wxMediator.clickOnItemMarkedAsPreviousItem(headless)
-																	.then((result) => {
-																		if (result) {
-																			logger.log('successfully clicked on prevoiusly marked item');
-
-																			// click on send button
-																			wxMediator.clickOnSendButton(headless)
-																				.then((result) => {
-																					if (result) {
-																						logger.log('successfully clicked on send button');
-																						resolve();
-																					}
-																					else {
-																						logger.log('failed to click on send button');
-																						resolve();
-																					}
-																				})
-																				.catch((err) => {
-																					logger.log(err);
-
-																					// resolve it, and process next message
-																					resolve();
-																				});
-																			}
-																			else {
-																				logger.log('failed to click on previously marked item');
-																				resolve();
-																			}
-																	})
-																	.catch((err) => {
-																		logger.log('failed to click on previously marked item');
-																		resolve();
-																	});
-																}
-																else {
-																	logger.log('[work around] failed to click on file helper');
-																	resolve();
-																}
-														})
-														.catch((err) => {
-															logger.log('[work around] failed to click on file helper');
-															resolve();
-														});
-												}
-												else {
-													logger.log('failed to set reply msg to textarea');
-
-													// resolve it, and process next message
-													resolve();
-												}
-											}).catch((err) => {
-												logger.log(err);
-
-												// resolve it, and process next message
-												resolve();
-											});
+										return resolve();
 									}
 									else {
 										// processor callback for message isn't set, then ignore it

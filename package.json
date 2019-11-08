@@ -1,6 +1,6 @@
 {
   "name": "wxbotserv",
-  "version": "0.5.1",
+  "version": "1.0.0-rc1",
   "description": "WeChat bot for normal user account that runs on server-side. Yes, server-side.",
   "main": "index.js",
   "scripts": {
@@ -25,7 +25,7 @@
   },
   "homepage": "https://github.com/abzico/wxbotserv#readme",
   "dependencies": {
-    "phantom": "^4.0.8",
+    "puppeteer": "^2.0.0",
     "request": "^2.83.0",
     "request-promise-native": "^1.0.5"
   }

@@ -1,4 +1,3 @@
-const req = require('request-promise-native');
 const headless = require('./browser/headless.js');
 const slackNotify = require('./notify/slack-notify.js');
 const defaultConfigs = require('./config.js');
@@ -34,50 +33,46 @@ let clearFn = function() {
 // listen to all sigterm signals
 process.on('SIGINT', () => { clearFn(); });
 
-function _onLoadFinished(status, msgProcessorFn, options) {
-	if (status == 'success') {
-		// emit event
-		events.emit(eventsConst.onLoadFinished);
+function _onLoadFinished(msgProcessorFn, options) {
+	events.emit(eventsConst.onLoadFinished);
 
-		logger.log('--- Page finished loading ---');
+    logger.log('--- Page finished loading ---');
 
-		logic.wxMediator.checkIsLoginPage(headless)
-			.then((isLoginPage) => {
-				logger.log(isLoginPage);
-				// if it's not login page, then we proceed
-				if (!isLoginPage) {
-					isChatPageVisited = true;
-					logger.log('--- it is chat page ---');
+	logic.wxMediator.checkIsLoginPage(headless)
+		.then((isLoginPage) => {
+			logger.log(isLoginPage);
+			// if it's not login page, then we proceed
+			if (!isLoginPage) {
+				isChatPageVisited = true;
+				logger.log('--- it is chat page ---');
+				// wait until contacts are loaded
+				waitUntilContactLoaded().then(() => {
+					logger.log('contacts are loaded');
 
-					// wait until contacts are loaded
-					waitUntilContactLoaded().then(() => {
-						logger.log('contacts are loaded');
+					// try to get all contacts once
+					logic.getAllContacts(headless)
+						.then((contacts) => {
+							logger.log('internally got all contacts: ', contacts);
+							// emit event with contacts
+							events.emit(eventsConst.onGotAllContacts, contacts);
 
-						// try to get all contacts once
-						logic.getAllContacts(headless)
-							.then((contacts) => {
-								logger.log('internally got all contacts: ', contacts);
+							// clear interval first if already created
+							if (intervalId) {
+								clearInterval(intervalId);
+								intervalId = null;
+							}
+							// now the page is loaded successfully
+							// use delay from specified options or default value
+							intervalId = setInterval(() => {
+								logic.processMsgs(headless, msgProcessorFn);
+							}, defaultConfigs.processMsgDelay || (options && options.processMsgDelay));
 
-								// emit event with contacts
-								events.emit(eventsConst.onGotAllContacts, contacts);
-
-								// clear interval first if already created
-								if (intervalId) {
-									clearInterval(intervalId);
-									intervalId = null;
-								}
-								// now the page is loaded successfully
-								// use delay from specified options or default value
-								intervalId = setInterval(() => {
-									logic.processMsgs(headless, msgProcessorFn);
-								}, defaultConfigs.processMsgDelay || (options && options.processMsgDelay));
-
-								logger.log('setup msg-processor function now');
-							})
-							.catch((err) => {
-								logger.log(err);
-							});
+							logger.log('setup msg-processor function now');
+						})
+						.catch((err) => {
+							logger.log(err);
 						});
+					});
 				}
 				// this means the page dies and goes back to login page
 				// as there might be another instance of logging in
@@ -104,7 +99,6 @@ function _onLoadFinished(status, msgProcessorFn, options) {
 			.catch((err) => {
 				logger.log(err);
 			});
-	}
 }
 
 function _onResourceRequested(requestData) {
@@ -114,14 +108,14 @@ function _onResourceRequested(requestData) {
 	logger.log('Requesting: ',requestData.url);
 
 	// check if such url is qrcode image
-	if (/https\:\/\/login.weixin\.qq\.com\/qrcode\/(?:.+?)/.test(requestData.url)) {
+	if (/https\:\/\/login.weixin\.qq\.com\/qrcode\/(?:.+?)/.test(requestData.url())) {
 
 		// notify via slack if SLACK_WEBHOOK_URL is set
 		// if not set, then ignore
 		if (process.env.SLACK_WEBHOOK_URL != null) {
 			logger.log('sending msg to slack');
 			// notify via slack
-			slackNotify.sendMsg(requestData.url, process.env.SLACK_WEBHOOK_URL)
+			slackNotify.sendMsg(requestData.url(), process.env.SLACK_WEBHOOK_URL)
 				.then((res) => {
 					logger.log('Sent QRCode image to slack successfully.');
 				})
@@ -138,7 +132,7 @@ function _onResourceReceived(resource) {
 
 	// if phantom makes request for contact, and we received the response
 	// then we will mark that we received information
-	if (!isLoadedContactsCurrentPage && /^https:\/\/web\.wechat\.com\/cgi-bin\/mmwebwx-bin\/webwxbatchgetcontact.+/.test(resource.url)) {
+	if (!isLoadedContactsCurrentPage && /^https:\/\/web\.wechat\.com\/cgi-bin\/mmwebwx-bin\/webwxbatchgetcontact.+/.test(resource.url())) {
 		logger.log('received response for contact request');
 		isLoadedContactsCurrentPage = true;
 	}
@@ -170,17 +164,9 @@ function start(msgProcessorFn, options) {
 	return new Promise((resolve, reject) => {
 		// open url along with callbacks
 		headless.openURL('https://wx.qq.com', {
-			onLoadFinished: (status) => {
-				_onLoadFinished(status, msgProcessorFn, options);
-			},
-
-			onResourceRequested: (requestData) => {
-				_onResourceRequested(requestData);
-			},
-
-			onResourceReceived: (resource) => {
-				_onResourceReceived(resource);
-			}
+			load: _onLoadFinished.bind(this, msgProcessorFn, options),
+			request: _onResourceRequested,
+			response: _onResourceReceived,
 		})
 		.then((content) => {
 			logger.log('successfully started the bot');

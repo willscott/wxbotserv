@@ -1,26 +1,6 @@
 require('../promise-retry.js');
-const phantom = require('phantom');
+const pup = require('puppeteer');
 let _ph, _page;
-
-function setupEventListeners(options) {
-	if (_page == null || options == null) return;
-
-	if (options.onLoadFinished) {
-		_page.on('onLoadFinished', (status) => {
-			options.onLoadFinished(status);
-		});
-	}
-	if (options.onResourceRequested) {
-		_page.on('onResourceRequested', (requestData) => {
-			options.onResourceRequested(requestData);
-		});
-	}
-	if (options.onResourceReceived) {
-		_page.on('onResourceReceived', (resource) => {
-			options.onResourceReceived(resource);
-		});
-	}
-}
 
 var _ = {
 	// page property
@@ -35,35 +15,14 @@ var _ = {
 	 * @return {Object}     Promise object. Success will contain result from opening page. Otherwise return error object.
 	 */
 	openURL: function(url, options) {
-
-		return new Promise((resolve, reject) => {
-			phantom.create()
-				.then((ph) => {
-					_ph = ph;
-					this.instance = _ph;
-					return _ph.createPage();
-				}, (err) => {
-					reject(err);
-				})
-
-				.then((page) => {
-					_page = page;
-					this.page = _page;
-
-					// set event listeners
-					setupEventListeners(options);
-
-					return _page.open(url);
-				}, (err) => {
-					reject(err);
-				})
-
-				.then((status) => {
-					resolve(_page.property('content'));
-				}, (err) => {
-					reject(err);
-				})
-		});
+		let fn = async () => {
+			const browser = await pup.launch();
+			const page = await browser.newPage();
+			await page.goto(url, {waitUntil: 'networkidle2'});
+			_page = page;
+			return page.content();
+		};
+		return fn();
 	},
 
 	/**
